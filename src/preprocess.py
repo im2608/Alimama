@@ -472,12 +472,14 @@ def onehot_columns(dftrain_total, dftest):
     sparse_mat_col_idx_dict = {'idx':0}
     
     # column 在onehot之后，在稀疏矩阵中的 列索引
-    onehot_col_list = ['item_id',               'item_brand_id', 
+    onehot_col_list = [#'item_id',
+                       'item_brand_id', 
                        'item_city_id',          'user_gender_id', 
                        'user_age_level',        'user_occupation_id', 
-                       'user_star_level',       'context_page_id', 
-                       'hour',                  'shop_star_level', 
+                       'user_star_level',       'context_page_id',
+                       'hour',                  'shop_star_level',
                        'shop_review_num_level', 'shop_id', 'item_category_list']
+
     for onehot_col_name in onehot_col_list:
         create_onehot_col_idx(dftrain_total, onehot_col_name,sparse_mat_col_idx_dict)
         create_onehot_col_idx(dftest, onehot_col_name,sparse_mat_col_idx_dict)
@@ -485,15 +487,17 @@ def onehot_columns(dftrain_total, dftest):
      #  得到每个property的列索引
     dftrain_total['item_property_list'].apply(split_item_property_list, args=(sparse_mat_col_idx_dict,)) 
     
-    # 这些列不需要onehont编码，直接copy到稀疏矩阵中
+    # 这些列已经计算完毕的特征值，不需要onehont编码，直接copy到稀疏矩阵中
     float_col_list = ['shop_review_positive_rate', 'shop_score_service', 
-                      'shop_score_delivery', 'shop_score_description',]
+                      'shop_score_delivery', 'shop_score_description', 'click_at_hour',
+                      'click_hour_ratio_at_day',  'user_click_max_at_hour', 'user_click_min_at_hour',
+                      'click_ratio_on_item_id_at_hour',  'click_ratio_on_shop_id_at_hour']
 
     for float_col in float_col_list:
         sparse_mat_col_idx_dict[float_col] = sparse_mat_col_idx_dict['idx']
         sparse_mat_col_idx_dict['idx'] += 1 
 
-    print(getCurrentTime(), "sparse_mat_col_idx_dict len is ", sparse_mat_col_idx_dict['idx']) # 76712
+    print(getCurrentTime(), "sparse_mat_col_idx_dict len is ", sparse_mat_col_idx_dict['idx'])
     
     df_train = dftrain_total[dftrain_total['date'] != '2018-09-24']
     df_train.index = range(df_train.shape[0])
@@ -513,8 +517,8 @@ def onehot_columns(dftrain_total, dftest):
     for df, dok in zip(df_list, sparse_matrix):
         set_sparse_matrix(df, dok, sparse_mat_col_idx_dict, onehot_col_list, float_col_list)
 
-    print(getCurrentTime(), "here are %d nonzeor values in train, %d nonzero values in verify, %d nonzero values in test" %
-                            (dok_train.nnz, dok_verify.nnz, dok_test.nnz))
+    print(getCurrentTime(), "here are %d nonzeor values in train %s, %d nonzero values in verify %s, %d nonzero values in test %s" %
+                            (dok_train.nnz, dok_train.shape, dok_verify.nnz, dok_verify.shape, dok_test.nnz, dok_test.shape))
 
     np.save(r"%s\..\input\sparse_train" % runningPath, dok_train)
     np.save(r"%s\..\input\sparse_verify" % runningPath, dok_verify)
@@ -597,12 +601,12 @@ if __name__ == '__main__':
 #     predicted_cat_prop_f1(df)
 #     cat_prop_f1_trade(df)
 
-    onehot_columns(df, dftest)
+#     onehot_columns(df, dftest)
 #     shop_trade(df)
 #     hour_trade(df)
 #     item_cat_trade(df)
 #     ad_trade(df)
 
-    
+    user_click_count_at_hour(df[df['date']=='2018-09-18'])
     
     

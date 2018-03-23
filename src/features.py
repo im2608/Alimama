@@ -5,110 +5,72 @@ Created on Mar 15, 2018
 '''
 
 import pandas as pd 
-import matplotlib.pyplot as plt
+
 import numpy as np
 
-def autolabel(rects):
-    for rect in rects:
-        height = rect.get_height()
-        plt.text(rect.get_x()+rect.get_width()/2., 1.03*height, '%.2f' % float(height))
-        
-def trade_ratio(df, colname):
+
+# 得到 col name 各个值中 is_trade = 1 的比例        
+def get_trade_ratio(df, colname):
     gp = df[[colname, 'is_trade']].groupby([colname, 'is_trade'], sort=True, as_index=False)
     gp = gp.size().unstack().reset_index()
-    gp['trade ratio'] = gp[1]/(gp[0] + gp[1])
-#     gp = gp.sort_values('trade ratio', axis=0, ascending=False)
-    plt.xticks(range(gp.shape[0]), gp[colname], rotation=90)
-    plt.xlabel('trade ratio on ' + colname)
-    plt.bar(range(gp.shape[0]), gp['trade ratio'])
-    plt.grid(True)
+    gp.fillna(0, inplace=True)
+    gp['trade ratio of ' + colname] = gp[1]/(gp[0] + gp[1])
+    df = pd.merge(df, gp, how='left', on=[colname])
+    return df, gp
 
-    return
-        
-# 用户在context page 购买数量占该  context page 总数量的比例
-def context_page_trade_ratio(df):
-    context_page = df[['context_page_id', 'is_trade']].groupby(['context_page_id', 'is_trade'], sort=True, as_index=False)
-    context_page = context_page.size().unstack().reset_index()
-    context_page['trade ratio'] = context_page[1]/(context_page[0] + context_page[1])
-    context_page = context_page.sort_values('trade ratio', axis=0, ascending=False)
-    plt.xticks(range(context_page.shape[0]), context_page['context_page_id'], rotation=90)
-    plt.xlabel("trade ratio on each context page")
-    rects = plt.bar(range(context_page.shape[0]), context_page['trade ratio'])
-    
-    plt.show()
-    return
-
-# 用户在 hour 上的购买数量占该 hour 总数量的比例
-def hour_trade_ratio(df):
-    hour_trade = df[['hour', 'is_trade']].groupby(['hour', 'is_trade'], sort=True, as_index=False)
-    hour_trade = hour_trade.size().unstack().reset_index()
-    hour_trade['hour trade ratio'] = hour_trade[1]/(hour_trade[0] + hour_trade[1])
-    hour_trade = hour_trade.sort_values('hour trade ratio', axis=0, ascending=False)
-    plt.xticks(range(hour_trade.shape[0]), hour_trade['hour'], rotation=90)
-    rects = plt.bar(range(hour_trade.shape[0]), hour_trade['hour trade ratio'])
-
-    plt.xlabel("trade ratio at each hour")
-#     autolabel(rects)
-    
-    plt.show()    
-    return
+def trade_ratio_of_colname(df, ratio_of_colname):
+    for each in ratio_of_colname:
+        df, _ = get_trade_ratio(df, each) 
+    return df
 
 
-def ad_trade_ratio(df):
-    plt.subplot(221)
-    trade_ratio(df, "item_price_level")
-     
-    plt.subplot(222)
-    trade_ratio(df, "item_sales_level")
-     
-    plt.subplot(223)
-    trade_ratio(df, "item_collected_level")
-     
-    plt.subplot(224)
-    trade_ratio(df, "item_pv_level")
-    
-    plt.show()
-    return
+def user_click_count_at_hour(df): 
+    def user_click_on_column_at_hour(df, colname, click_at_hour):
+        # 用户在 colname 上各个小时的点击数量
+        click_on_col_at_hour = df[['user_id', colname, 'hour']].groupby(['user_id', colname, 'hour'], sort=False, as_index=False) 
+        click_on_col_at_hour = click_on_col_at_hour.size().reset_index()
+        click_on_col_at_hour.rename(columns={0:"click_on_%s_at_hour" % colname}, inplace=True)
 
-def user_trade_ratio(df):
-    plt.subplot(221)
-    trade_ratio(df, "user_gender_id")
-    
-    plt.subplot(222)
-    trade_ratio(df, "user_age_level")
-    
-    plt.subplot(223)
-    trade_ratio(df, "user_occupation_id")
-    
-    plt.subplot(224)
-    trade_ratio(df, "user_star_level")
-    
-    plt.show()
+        # 用户在 colname 上各个小时的点击数量/用户各个小时的点击数量
+        tmp = pd.merge(click_on_col_at_hour, click_at_hour, how='left', on=['user_id', 'hour'])
+        tmp['click_ratio_on_%s_at_hour' % colname] = tmp["click_on_%s_at_hour" % colname] / tmp['click_at_hour']
 
-    return
+        df = pd.merge(df, tmp[['user_id', colname, 'hour', 'click_ratio_on_%s_at_hour' % colname]], how='left', on=['user_id', colname, 'hour'])
+        df.fillna(0, inplace=True)
 
-def shop_trafe_ratio(df):
-    plt.subplot(231)
-    trade_ratio(df, "shop_review_num_level")
+        return df
     
-    plt.subplot(232)
-    trade_ratio(df, "shop_review_positive_rate")
+    # 用户各个小时的点击数量
+    click_at_hour = df[['user_id', 'hour']].groupby(['user_id', 'hour'], sort=False, as_index=False) 
+    click_at_hour = click_at_hour.size().reset_index()
+    click_at_hour.rename(columns={0:"click_at_hour"}, inplace=True) 
     
-    plt.subplot(233)
-    trade_ratio(df, "shop_star_level")
-    
-    plt.subplot(234)
-    trade_ratio(df, "shop_score_service")
-    
-    plt.subplot(235)
-    trade_ratio(df, "shop_score_delivery")
-    
-    plt.subplot(236)
-    trade_ratio(df, "shop_score_description")
-    
-    plt.show()    
+    # 用户一天的点击数量
+    click_whole_day = df[['user_id', 'date']].groupby(['user_id', 'date'], sort=False, as_index=False)
+    click_whole_day = click_whole_day.size().reset_index()
+    click_whole_day.rename(columns={0:"click_whole_day"}, inplace=True)
+    del click_whole_day['date']
 
-    return
+    #  用户在各个小时的点击数量/用户一天的点击数量
+    tmp = pd.merge(click_at_hour, click_whole_day, how='left', on=['user_id'])
+    tmp['click_hour_ratio_at_day'] = tmp['click_at_hour'] / tmp['click_whole_day']
+    df = pd.merge(df, tmp[['user_id', 'click_at_hour', 'click_hour_ratio_at_day']], how='left', on='user_id')
+    
+    # 用户在各个小时的最大/最小点击数量
+    tmp = click_at_hour.groupby(['user_id'], as_index=False, sort=False)
+    click_min_max = tmp.max()
+    click_min_max.rename(columns={'click_at_hour':"user_click_max_at_hour"}, inplace=True)
+    click_min_max['user_click_min_at_hour'] = tmp.min()['click_at_hour']
+    del click_min_max['hour']
+    
+    df = pd.merge(df, click_min_max, how='left', on=['user_id'])
+    df.fillna(0, inplace=True)
+    
+    # 用户在item上各个小时的点击数量/用户各个小时的点击数量
+    df = user_click_on_column_at_hour(df, 'item_id', click_at_hour)    
+    
+    # 用户在 shop 上各个小时的点击数量/用户各个小时的点击数量
+    df = user_click_on_column_at_hour(df, 'shop_id', click_at_hour)
 
-
-
+    return df
+    
