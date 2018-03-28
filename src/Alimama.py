@@ -13,20 +13,30 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.neural_network import MLPClassifier
 import lightgbm as lgb
 
+def order_instance_id_as_test(prediction, dftest):
+    ordered_predition = pd.DataFrame(dftest['instance_id'])
+    ordered_predition['predicted_score'] = 0.0
+    for i in range(dftest.shap[0]):
+        ordered_predition.loc[i, 'predicted_score'] = prediction[prediction['instance_id'] == dftest.iloc[i]['instance_id']]['predicted_score']
+
+    return ordered_predition
+
 def main():
     print(getCurrentTime(), "running...")
     dok_train = np.load(r"%s\..\input\sparse_train.npy" % runningPath)[()]# train 中包括 '2018-09-17'-- '2018-09-23' 的数据
     dok_verify = np.load(r"%s\..\input\sparse_verify.npy" % runningPath)[()] # verify 中只包含了 '2018-09-24' 的数据
     dok_test = np.load(r"%s\..\input\sparse_test.npy" % runningPath)[()]
+    
+    test_instanceid = pd.read_csv(r'%s\..\input\test_instanceid.txt' % runningPath)
 
-    train_label = pd.read_csv(r'%s\..\input\train_label.txt' % runningPath, header=None)
-    train_label.columns = ['label']
-    verify_label = pd.read_csv(r'%s\..\input\verify_label.txt' % runningPath, header=None)
-    verify_label.columns = ['label']
+    train_label = pd.read_csv(r'%s\..\input\train_label.txt' % runningPath)
+
+    verify_label = pd.read_csv(r'%s\..\input\verify_label.txt' % runningPath)
+    verify_label_gped= verify_label.groupby('instance_id').mean().reset_index()
     
-    dftest = pd.read_csv(r'%s\..\input\test.txt' % runningPath)
+    dftest = pd.read_csv(r'%s\..\input\test.txt' % runningPath, dtype={'instance_id':np.str})
     
-    print(getCurrentTime(), "loading finished...")
+    print(getCurrentTime(), "loading finished... dftest shape", dftest.shape)
     
     forecast_date = '2018-09-24'
     
@@ -36,27 +46,32 @@ def main():
 
     round_number = 500
 
-    pos_idx = train_label[train_label['label'] == 1].index
-    neg_idx = train_label.sample(len(pos_idx) * 10)    
-    
-    training_samples_idx = pos_idx.append(neg_idx.index)
-    
-    print(getCurrentTime(), "training XGBoost...")
-    xgb_mod = xgb.train(params, xgb.DMatrix(dok_train[training_samples_idx], label=train_label.iloc[training_samples_idx]), round_number)
- 
     print(getCurrentTime(), "traiing LGBM...")
     clf = lgb.LGBMClassifier(num_leaves=63, max_depth=7, n_estimators=80, n_jobs=-1)
     
-    clf.fit(dok_train[training_samples_idx], train_label.iloc[training_samples_idx]['label'].values)
-    lgbm_predict_proba = pd.DataFrame(clf.predict_proba(dok_verify)[:, 1], columns=['label'])
-    lgb_logloss = -np.sum(verify_label['label'] * np.log(lgbm_predict_proba['label']) + 
-                          (1 - verify_label['label']) * np.log(1 - lgbm_predict_proba['label']))/ verify_label.shape[0] 
+    clf.fit(dok_train, train_label['is_trade'].values)
+    lgbm_predict_proba = pd.DataFrame(clf.predict_proba(dok_verify)[:, 1], columns=['is_trade'])
+    lgbm_predict_proba['instance_id'] = verify_label['instance_id']
+    lgbm_predict_proba = lgbm_predict_proba.groupby('instance_id').mean().reset_index()
+
+    lgb_logloss = -np.sum(verify_label_gped['is_trade'] * np.log(lgbm_predict_proba['is_trade']) + 
+                          (1 - verify_label_gped['is_trade']) * np.log(1 - lgbm_predict_proba['is_trade']))/ lgbm_predict_proba.shape[0] 
     print(getCurrentTime(), "lgb logloss %.6f" %(lgb_logloss))
+
+    print(getCurrentTime(), "training XGBoost...")
+    xgb_mod = xgb.train(params, xgb.DMatrix(dok_train, label=train_label['is_trade']), round_number)
+    xgb_predict_proba = pd.DataFrame(xgb_mod.predict(xgb.DMatrix(dok_verify)), columns=['is_trade'])
+    xgb_predict_proba['instance_id'] = verify_label['instance_id']
+    xgb_predict_proba = xgb_predict_proba.groupby('instance_id').mean().reset_index()
+
+    xgb_logloss = -np.sum(verify_label_gped['is_trade'] * np.log(xgb_predict_proba['is_trade']) + 
+                      (1 - verify_label_gped['is_trade']) * np.log(1 - xgb_predict_proba['is_trade']))/ lgbm_predict_proba.shape[0]
+    
+    print(getCurrentTime(), "xgb_logloss  %.6f" %(xgb_logloss))
 
 #     print(getCurrentTime(), "training MLP...")
 #     mlp = MLPClassifier(alpha=1e-5,hidden_layer_sizes=(32,64), random_state=1, activation='tanh', solver='sgd', 
 #                         learning_rate='adaptive', batch_size=128)
-    
 #     mlp_gs_param = {
 #         'activation':['tanh'], 
 #         'solver':['sgd'], 
@@ -64,75 +79,78 @@ def main():
 #         'batch_size':[512]
 #     }#         
 #     mlp_gs = GridSearchCV(mlp, mlp_gs_param, n_jobs=-1, cv=5, refit=True)
-#     mlp_gs.fit(dok_train, train_label['label'].values)
+#     mlp_gs.fit(dok_train, train_label['is_trade'].values)
 #     print("mlp_gs.best_params_", mlp_gs.best_params_)
 #     print("mlp_gs.best_score_", mlp_gs.best_score_)
- 
-#     mlp.fit(dok_train, train_label['label'].values)
+#     mlp.fit(dok_train, train_label['is_trade'].values)
 #     print("mlp.n_layers_", mlp.n_layers_)
 #     print("mlp.n_iter_", mlp.n_iter_)
 #     print("mlp.loss_", mlp.loss_)
 #     print("mlp.out_activation_", mlp.out_activation_)
 
     print(getCurrentTime(), "predicting...")
-    xgb_predict_proba = pd.DataFrame(xgb_mod.predict(xgb.DMatrix(dok_verify)), columns=['label'])
- 
-    xgb_logloss = -np.sum(verify_label['label'] * np.log(xgb_predict_proba['label']) + 
-                      (1 - verify_label['label']) * np.log(1 - xgb_predict_proba['label']))/ verify_label.shape[0]
     
-    print(getCurrentTime(), "xgb_logloss  %.6f" %(xgb_logloss))
-    
-    ensemble_predict_proba = (xgb_predict_proba['label'] + lgbm_predict_proba['label'])/2
-    ensemble_logloss = -np.sum(verify_label['label'] * np.log(ensemble_predict_proba) + 
-                      (1 - verify_label['label']) * np.log(1 - ensemble_predict_proba))/ verify_label.shape[0]
+    ensemble_predict_proba = (xgb_predict_proba['is_trade'] + lgbm_predict_proba['is_trade'])/2
+    ensemble_logloss = -np.sum(verify_label_gped['is_trade'] * np.log(ensemble_predict_proba) + 
+                      (1 - verify_label_gped['is_trade']) * np.log(1 - ensemble_predict_proba))/ ensemble_predict_proba.shape[0]
 
     print(getCurrentTime(), "ensemble_logloss  %.6f" %(ensemble_logloss))
 
 
-#     predict_proba = pd.DataFrame(mlp_gs.predict_proba(dok_verify)[:, 1], columns=['label'])
-#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['label'])
-#     mpl_logloss = -np.sum(verify_label['label'] * np.log(predict_proba['label']) + 
-#                           (1 - verify_label['label']) * np.log(1 - predict_proba['label']))/ verify_label.shape[0] 
+#     predict_proba = pd.DataFrame(mlp_gs.predict_proba(dok_verify)[:, 1], columns=['is_trade'])
+#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['is_trade'])
+#     mpl_logloss = -np.sum(verify_label['is_trade'] * np.log(predict_proba['is_trade']) + 
+#                           (1 - verify_label['is_trade']) * np.log(1 - predict_proba['is_trade']))/ verify_label.shape[0] 
 #     
 
-#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['label'])
-#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['label'])
-#     mpl_logloss = -np.sum(verify_label['label'] * np.log(predict_proba['label']) + 
-#                           (1 - verify_label['label']) * np.log(1 - predict_proba['label']))/ verify_label.shape[0] 
+#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['is_trade'])
+#     predict_proba = pd.DataFrame(mlp.predict_proba(dok_verify)[:, 1], columns=['is_trade'])
+#     mpl_logloss = -np.sum(verify_label['is_trade'] * np.log(predict_proba['is_trade']) + 
+#                           (1 - verify_label['is_trade']) * np.log(1 - predict_proba['is_trade']))/ verify_label.shape[0] 
 # 
 #     print(getCurrentTime(), "MLP logloss %.6f" %(mpl_logloss))
 
 
     # 确定参数后，  将 train 和 vrify 合并重新训练模型, sparse_train_total 包含了 train 和 vrify 
     dok_train = np.load(r"%s\..\input\sparse_train_total.npy" % runningPath)[()]
-    train_label = pd.read_csv(r'%s\..\input\train_label_total.txt' % runningPath, header=None)
-    train_label.columns = ['label']
-    print(dok_train.shape, train_label.shape)
+    train_label = pd.read_csv(r'%s\..\input\train_label_total.txt' % runningPath)
+    train_label_gped = train_label.groupby('instance_id').mean().reset_index()
+
+    print(getCurrentTime(), 
+          "dok_train.shape", dok_train.shape, 
+          "train_label.shape", train_label.shape, 
+          'train_label_gped.shape', train_label_gped.shape)
     
-    xgb_mod = xgb.train(params, xgb.DMatrix(dok_train, label=train_label), round_number)
+    xgb_mod = xgb.train(params, xgb.DMatrix(dok_train, label=train_label['is_trade']), round_number)
     xgb_predict_proba = pd.DataFrame(xgb_mod.predict(xgb.DMatrix(dok_test)), columns=['predicted_score'])
-    xgb_predict_proba['instance_id'] = dftest['instance_id']
+    xgb_predict_proba['instance_id'] = test_instanceid['instance_id']
+    xgb_predict_proba = xgb_predict_proba.groupby('instance_id').mean().reset_index()
     xgb_predict_proba = xgb_predict_proba[['instance_id', 'predicted_score']]
-    xgb_predict_proba.to_csv(r"%s\..\output\xgb_prediction.csv" % runningPath, index=False,  sep=' ')
+    xgb_predict_proba = order_instance_id_as_test(xgb_predict_proba, dftest)
+    xgb_predict_proba.to_csv(r"%s\..\output\xgb_prediction.csv" % runningPath, index=False,  sep=' ', encoding='utf-8')
      
 #     mlp = MLPClassifier(**mlp_gs.best_params_)
-#     mlp.fit(dok_train, train_label['label'].values)
+#     mlp.fit(dok_train, train_label['is_trade'].values)
 #     predict_proba = pd.DataFrame(mlp.predict_proba(dok_test)[:, 1], columns=['predicted_score'])
 #     predict_proba['instance_id'] = dftest['instance_id']
 #     predict_proba = predict_proba[['instance_id', 'predicted_score']]
-#     predict_proba.to_csv(r"%s\..\output\mlp_prediction.csv" % runningPath, index=False,  sep=' ')
+#     predict_proba.to_csv(r"%s\..\output\mlp_prediction.csv" % runningPath, index=False,  sep=' ', float_format='{:f}'.format, encoding='utf-8')
 
-    clf.fit(dok_train, train_label['label'].values)
+    clf.fit(dok_train, train_label['is_trade'].values)
     lgbm_predict_proba = pd.DataFrame(clf.predict_proba(dok_test)[:, 1], columns=['predicted_score'])
-    lgbm_predict_proba['instance_id'] = dftest['instance_id']
+    lgbm_predict_proba['instance_id'] = test_instanceid['instance_id']
+    lgbm_predict_proba = lgbm_predict_proba.groupby('instance_id').mean().reset_index()
     lgbm_predict_proba = lgbm_predict_proba[['instance_id', 'predicted_score']]
-    lgbm_predict_proba.to_csv(r"%s\..\output\lgb_prediction.csv" % runningPath, index=False,  sep=' ')
+    lgbm_predict_proba = order_instance_id_as_test(lgbm_predict_proba, dftest)
+    lgbm_predict_proba.to_csv(r"%s\..\output\lgb_prediction.csv" % runningPath, index=False,  sep=' ', encoding='utf-8')
     
     ensemble_predict_proba = pd.DataFrame()
     ensemble_predict_proba['instance_id'] = xgb_predict_proba['instance_id'] 
     ensemble_predict_proba['predicted_score'] = (xgb_predict_proba['predicted_score'] + lgbm_predict_proba['predicted_score']) / 2
-
-    ensemble_predict_proba.to_csv(r"%s\..\output\ensemble_prediction.csv" % runningPath, index=False,  sep=' ')
+    ensemble_predict_proba = order_instance_id_as_test(ensemble_predict_proba, dftest)
+    ensemble_predict_proba.to_csv(r"%s\..\output\ensemble_prediction.csv" % runningPath, index=False,  sep=' ', encoding='utf-8')
+    
+    
     return 
 
 if (__name__ == '__main__'):

@@ -11,6 +11,9 @@ import datetime
 import numpy as np
 from global_variables import *
 from features import *
+from shop_features import *
+from greenlet import getcurrent
+
 pd.options.display.float_format = '{:.2f}'.format
 
 def set_subplot(df, colname, how_display=plt.bar):
@@ -468,7 +471,7 @@ def set_sparse_matrix(df, sparse_dok, sparse_mat_col_idx_dict, onehot_col_list, 
         for float_col_name in float_col_list:
             sparse_dok[row_idx, sparse_mat_col_idx_dict[float_col_name]] = df.loc[row_idx, float_col_name]
     
-def onehot_columns(dftrain_total, dftest):
+def onehot_columns(dftrain_total, dftest, new_features_name):
     sparse_mat_col_idx_dict = {'idx':0}
     
     # column 在onehot之后，在稀疏矩阵中的 列索引
@@ -489,9 +492,8 @@ def onehot_columns(dftrain_total, dftest):
     
     # 这些列已经计算完毕的特征值，不需要onehont编码，直接copy到稀疏矩阵中
     float_col_list = ['shop_review_positive_rate', 'shop_score_service', 
-                      'shop_score_delivery', 'shop_score_description', 'click_at_hour',
-                      'click_hour_ratio_at_day',  'user_click_max_at_hour', 'user_click_min_at_hour',
-                      'click_ratio_on_item_id_at_hour',  'click_ratio_on_shop_id_at_hour']
+                      'shop_score_delivery', 'shop_score_description',]
+    float_col_list.extend(new_features_name)
 
     for float_col in float_col_list:
         sparse_mat_col_idx_dict[float_col] = sparse_mat_col_idx_dict['idx']
@@ -525,10 +527,10 @@ def onehot_columns(dftrain_total, dftest):
     np.save(r"%s\..\input\sparse_test" % runningPath, dok_test)
     np.save(r"%s\..\input\sparse_train_total" % runningPath, dok_total_train)
     
-    df_train['is_trade'].to_csv(r"%s\..\input\train_label.txt" % runningPath, index=False)
-    df_verify['is_trade'].to_csv(r"%s\..\input\verify_label.txt" % runningPath, index=False)
-    dftrain_total['is_trade'].to_csv(r"%s\..\input\train_label_total.txt" % runningPath, index=False)
-    
+    df_train[['instance_id', 'is_trade']].to_csv(r"%s\..\input\train_label.txt" % runningPath, index=False)
+    df_verify[['instance_id', 'is_trade']].to_csv(r"%s\..\input\verify_label.txt" % runningPath, index=False)
+    dftrain_total[['instance_id', 'is_trade']].to_csv(r"%s\..\input\train_label_total.txt" % runningPath, index=False)
+    dftest[['instance_id']].to_csv(r"%s\..\input\test_instanceid.txt" % runningPath, index=False)
     print(getCurrentTime(), "done")
 
     return 0
@@ -578,8 +580,41 @@ def round_ratio(df):
 #####################################################################################################################
 
 
+def extract_features(df, dftest):
+    original_features = set(dftest.columns)
+    
+    train_date = ['2018-09-17', '2018-09-18', '2018-09-19', '2018-09-20', '2018-09-21', '2018-09-22', '2018-09-23', '2018-09-24']
+    df_2 = []
+    for each in train_date:
+        tmp = df[df['date']==each]
+        each_date_of_df = user_click_count(tmp)
+        each_date_of_df = shop_click_count(each_date_of_df) 
+        print(getCurrentTime(), "date %s, before shape %s, after extacting feature shape %s" % (each, tmp.shape, each_date_of_df.shape))
+        df_2.append(each_date_of_df)
+
+    df = pd.concat(df_2, axis=0,ignore_index=True)
+
+    test_date = ['2018-09-24', '2018-09-25']
+    dftest_2 = []
+    for each in test_date:
+        tmp = dftest[dftest['date']==each]
+        each_date_of_df = user_click_count(tmp)
+        each_date_of_df = shop_click_count(each_date_of_df)
+        dftest_2.append(each_date_of_df)
+
+    dftest = pd.concat(dftest_2, axis=0,ignore_index=True)
+    
+    new_features = list(set(dftest.columns) - original_features)
+    print(getCurrentTime(), "df shape %s, dftest shape %s, new features %d" % (df.shape, dftest.shape, len(new_features)))
+
+    return df, dftest, new_features
+
+#####################################################################################################################
+#####################################################################################################################
+#####################################################################################################################
 
 if __name__ == '__main__':
+    print(getCurrentTime(), " running...")
     dftest = pd.read_csv(r'%s\..\input\test.txt' % runningPath)
     df = pd.read_csv(r'%s\..\input\train.txt' % runningPath)
     
@@ -607,6 +642,6 @@ if __name__ == '__main__':
 #     item_cat_trade(df)
 #     ad_trade(df)
 
-    user_click_count_at_hour(df[df['date']=='2018-09-18'])
-    
+    df, dftest, new_features = extract_features(df, dftest)
+    onehot_columns(df, dftest, new_features)
     
