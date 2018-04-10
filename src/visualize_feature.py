@@ -19,7 +19,7 @@ def visualize_trade_ratio(df, colname):
     df, gp = get_trade_ratio(df, colname)
     plt.xticks(range(gp.shape[0]), gp[colname], rotation=90)
     plt.xlabel('trade ratio on ' + colname)
-    plt.bar(range(gp.shape[0]), gp['trade ratio'])
+    plt.bar(range(gp.shape[0]), gp['trade ratio of ' + colname])
     plt.grid(True)
 
     return
@@ -32,7 +32,7 @@ def context_page_trade_ratio(df):
     context_page = context_page.sort_values('trade ratio', axis=0, ascending=False)
     plt.xticks(range(context_page.shape[0]), context_page['context_page_id'], rotation=90)
     plt.xlabel("trade ratio on each context page")
-    
+    plt.bar(range(context_page.shape[0]), context_page['trade ratio'])
     
     plt.show()
     return
@@ -52,6 +52,18 @@ def hour_trade_ratio(df):
     plt.show()    
     return
 
+
+def item_category_trade_ratio(df):
+    category_page = df[['item_category_list', 'is_trade']].groupby(['item_category_list', 'is_trade'], sort=False, as_index=False)
+    category_page = category_page.size().unstack().reset_index()
+    category_page['trade ratio'] = category_page[1]/(category_page[0] + category_page[1])
+#     category_page = category_page.sort_values('trade ratio', axis=0, ascending=False)
+    plt.xticks(range(category_page.shape[0]), category_page['item_category_list'], rotation=90)
+    plt.xlabel("trade ratio on each item category")
+    plt.bar(range(category_page.shape[0]), category_page['trade ratio'])
+    
+    plt.show()    
+    return
 
 def ad_trade_ratio(df):
     plt.subplot(221)
@@ -86,7 +98,7 @@ def user_trade_ratio(df):
 
     return
 
-def shop_trafe_ratio(df):
+def shop_trade_ratio(df):
     plt.subplot(231)
     visualize_trade_ratio(df, "shop_review_num_level")
     
@@ -108,3 +120,4 @@ def shop_trafe_ratio(df):
     plt.show()    
 
     return
+

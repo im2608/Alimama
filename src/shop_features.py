@@ -58,71 +58,100 @@ from global_variables import *
 #     return df
 #             
 
+def shop_click_ratio_on_level(df, level_name):
+    # shop level 上的一天总的点击数量
+    tmp = df[[level_name]].groupby(level_name, sort=False, as_index=False)
+    tmp = tmp.size().reset_index()
+    tmp.rename(columns={0:"%s_click_cnt" % level_name}, inplace=True)
+    
+    df = pd.merge(df, tmp, how='left', on=[level_name])
+    df['shop_click_ratio_on_%s' % level_name] = df['shop_click_whole_day'] / df["%s_click_cnt" % level_name]
+    return df
 
+def shop_features(df): 
+    def shop_click_on_column_at_day(df, colname, col_level):
+        # shop 在 colname 上的点击数量
+        click_on_col = df[['shop_id', colname]].groupby(['shop_id', colname], sort=False, as_index=False) 
+        click_on_col = click_on_col.size().unstack().fillna(0)
+        for each_level in col_level: # group 之后,  level 上可能没数据，在这里补全
+            if (each_level not in click_on_col.columns):
+                click_on_col[each_level] = 0
 
-def fillin_shop_click(shop_click_info, click_at_hour_df, prog):
-    shop_id = shop_click_info['shop_id']
-    hour = shop_click_info['hour']
-    click_at_hour_df.loc[click_at_hour_df['shop_id'] == shop_id, 'shop_click_at_hour_%d' % hour] = shop_click_info['shop_click_at_hour'] 
-    click_at_hour_df.loc[click_at_hour_df['shop_id'] == shop_id, 'shop_click_ratio_at_hour_%d_on_day' % hour] = shop_click_info['shop_click_hour_ratio_at_day']
-   
-    prog['idx'] += 1
-    if (prog['idx'] % 1000 == 0):
-        print(getCurrentTime(), "%d lines handeld" % prog['idx'])
+        click_on_col.rename(columns=lambda level: 'shop_click_on_%s_%d' % (colname, level), inplace=True)
+        click_on_col = click_on_col.reset_index()
+        
+        df = pd.merge(df, click_on_col, how='left', on='shop_id')
+        # shop 在 colname 上的点击数量 / shop 一整天的点击数量
+        for each_level in col_level:
+            df['shop_click_ratio_on_%s_%d' % (colname, each_level)] = df['shop_click_on_%s_%d' % (colname, each_level)]/df['shop_click_whole_day']
+            
+        df.fillna(0, inplace=True)
 
-    return
-
-def shop_click_count(df): 
-    def shop_click_on_column_at_hour(df, colname, click_at_hour):
+        return df
+    
+    def shop_click_on_column_at_hour(df, colname):
         # shop 在 colname 上各个小时的点击数量
         click_on_col_at_hour = df[['shop_id', colname, 'hour']].groupby(['shop_id', colname, 'hour'], sort=False, as_index=False) 
-        click_on_col_at_hour = click_on_col_at_hour.size().reset_index()
-        click_on_col_at_hour.rename(columns={0:"shop_click_on_%s_at_hour" % colname}, inplace=True)
+        click_on_col_at_hour = click_on_col_at_hour.size().unstack().fillna(0)
+        for hour in range(24):
+            if (hour not in click_on_col_at_hour.columns):
+                click_on_col_at_hour[hour] = 0.0
 
-        # shop 在 colname 上各个小时的点击数量/shop 各个小时的点击数量
-        tmp = pd.merge(click_on_col_at_hour, click_at_hour, how='left', on=['shop_id', 'hour'])
-        tmp['shop_click_ratio_on_%s_at_hour' % colname] = tmp["shop_click_on_%s_at_hour" % colname] / tmp['shop_click_at_hour']
+        click_on_col_at_hour.rename(columns=lambda hour : "shop_click_on_%s_at_hour_%d" % (colname, hour), inplace=True)
+        click_on_col_at_hour = click_on_col_at_hour.reset_index()
+        df = pd.merge(df, click_on_col_at_hour, how='left', on=['shop_id', colname])
+        df.fillna(0, inplace=True)
+        
+        # shop 在 colname 上各个小时的点击数量 / shop 在各个 hour 上总的点击数量
+        for hour in range(24):
+            df['shop_click_ratio_on_%s_at_hour_%d' % (colname, hour)] = df['shop_click_at_hour_%d' % hour] / df["shop_click_on_%s_at_hour_%d" % (colname, hour)]
 
-        df = pd.merge(df, tmp[['shop_id', colname, 'hour', 'shop_click_ratio_on_%s_at_hour' % colname]], how='left', on=['shop_id', colname, 'hour'])
         df.fillna(0, inplace=True)
 
         return df
     
     # shop 各个小时的点击数量
     click_at_hour = df[['shop_id', 'hour']].groupby(['shop_id', 'hour'], sort=False, as_index=False) 
-    click_at_hour = click_at_hour.size().reset_index()
-    click_at_hour.rename(columns={0:"shop_click_at_hour"}, inplace=True) 
-    
-    click_col = ["shop_click_at_hour_%d" % h for h in range(24)] # shop 各个小时的点击数量onehot成列
-    click_col.extend(['shop_click_ratio_at_hour_%d_on_day' % h for h in range(24)]) #  shop 在各个小时的点击数量/shop 一天的点击数量 onehot成列
-    click_at_hour_df = pd.DataFrame(columns=click_col)
-    click_at_hour_df['shop_id'] = click_at_hour['shop_id'].unique()
+    click_at_hour = click_at_hour.size().unstack()
+    for hour in range(24): # group 之后, 某个 hour 上可能没数据，在这里补全
+        if (hour not in click_at_hour.columns):
+            click_at_hour[hour] = 0
+
+    click_at_hour.rename(columns=lambda x: "shop_click_at_hour_%d" % x, inplace=True)
+    click_at_hour = click_at_hour.reset_index()
     
     # shop 一天的点击数量
     click_whole_day = df[['shop_id', 'date']].groupby(['shop_id', 'date'], sort=False, as_index=False)
     click_whole_day = click_whole_day.size().reset_index()
-    click_whole_day.rename(columns={0:"click_whole_day"}, inplace=True)
+    click_whole_day.rename(columns={0:"shop_click_whole_day"}, inplace=True)
     del click_whole_day['date']
-    
-    prog = {'idx':0}
 
-    #  shop 在各个小时的点击数量/shop 一天的点击数量
+    #  shop 在各个小时的点击数量 / shop 一天的点击数量
     tmp = pd.merge(click_at_hour, click_whole_day, how='left', on=['shop_id'])
-    tmp['shop_click_hour_ratio_at_day'] = tmp['shop_click_at_hour'] / tmp['click_whole_day']
-    tmp.apply(fillin_shop_click, axis=1, args = (click_at_hour_df, prog, )) # 在行上apply
-    
-    click_at_hour_df.fillna(0, inplace=True)
-    
-    # shop 在各个小时的最大/最小点击数量
-    tmp = click_at_hour.groupby(['shop_id'], as_index=False, sort=False)
-    click_at_hour_df['shop_click_max_at_hour'] = tmp.max()['shop_click_at_hour']
-    click_at_hour_df['shop_click_min_at_hour'] = tmp.min()['shop_click_at_hour'] 
-    
-    df = pd.merge(df, click_at_hour_df, how='left', on=['shop_id'])
+    for hour in range(24):
+        tmp['shop_click_ratio_at_hour_%d_at_day' % hour] = tmp['shop_click_at_hour_%d' % hour] / tmp['shop_click_whole_day']
+    tmp.fillna(0, inplace=True)
+    df = pd.merge(df, tmp, how='left', on=['shop_id'])
     df.fillna(0, inplace=True)
     
-    # shop 中 item 上各个小时的点击数量/shop 各个小时的点击数量
-    df = shop_click_on_column_at_hour(df, 'item_id', click_at_hour)    
+    # shop 在 item 上各个小时的点击数量 / shop 在各个小时的点击数量 
+    df = shop_click_on_column_at_hour(df, 'item_id')
+    
+    for col, level in ITEM_LEVELS_DICT.items():
+        df = shop_click_on_column_at_day(df, col, level) # shop 在 level 上的点击数量 / shop 一整天的点击数量
+
+    # shop 的 item 上的点击数量
+    click_on_col = df[['shop_id', 'item_id']].groupby(['shop_id', 'item_id'], sort=False, as_index=False) 
+    click_on_col = click_on_col.size().reset_index()
+    click_on_col.rename(columns={0:"item_click_of_shop"}, inplace=True)
+    df = pd.merge(df, click_on_col, how='left', on=['shop_id', 'item_id'])
+    
+    # shop 的 item 上的点击数量 /  shop 一整天的点击数量
+    df['item_click_ratio_of_shop'] = df['item_click_of_shop'] / df['shop_click_whole_day']
+    df.fillna(0, inplace=True)
+    
+    # shop 一整天的点击数量 / 该 shop level 总的点击数量 
+    for level_name in SHOP_LEVELS_DICT.keys():
+        df = shop_click_ratio_on_level(df, level_name)
 
     return df
-    
