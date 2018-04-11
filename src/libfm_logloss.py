@@ -20,7 +20,7 @@ def logloss():
     return
 
 def gen_predictio():
-    libfm_pred = pd.read_csv(r'%s\..\output\libfm_predict.csv' % runningPath, header=None)
+    libfm_pred = pd.read_csv(r'%s\..\output\libfm.csv' % runningPath, header=None)
     libfm_pred.columns = ['predicted_score']
     test_instanceid = pd.read_csv(r'%s\..\input\test_instanceid.txt' % runningPath)
     test_instanceid['predicted_score'] = libfm_pred['predicted_score']
@@ -28,7 +28,7 @@ def gen_predictio():
     return
 
 if (__name__ == '__main__'):
-    logloss()
+    gen_predictio()
 
 
 

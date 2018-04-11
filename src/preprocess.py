@@ -472,10 +472,10 @@ def set_sparse_matrix(df, sparse_dok, sparse_mat_col_idx_dict, onehot_col_list, 
 
 
 def write_libfmtxtfile_and_dok(each_sample, output_libfm_file, sparse_mat_col_idx_dict, args_apply):
-    if (args_apply['idx'] % 1000 == 0):
+    if (each_sample.name % 1000 == 0):
         l1000 = time.clock()
         print(getCurrentTime(), "%d / %d lines read, p1 %d, p2 %d, p3 %d (3-1 %d), time used %d\r" % 
-              (args_apply['idx'], 
+              (each_sample.name, 
                args_apply['total'], args_apply['p1_time'], args_apply['p2_time'], args_apply['p3_time'], args_apply['p3_1_time'],
                l1000 - args_apply['L1000']), end="")
 
@@ -487,11 +487,14 @@ def write_libfmtxtfile_and_dok(each_sample, output_libfm_file, sparse_mat_col_id
         each_line = ["%d" % 0]
 
     sparse_dok = args_apply['dok']
+#     if (args_apply['idx'] >= 18370):        
+#         print(args_apply['idx'], each_sample.name, sparse_dok.shape)
 
     for onehot_col_name in onehot_col_list:
-        tmp = onehot_col_name + np.str(each_sample[onehot_col_name])
-        sparse_dok[args_apply['idx'], sparse_mat_col_idx_dict[tmp]] = 1
-        
+        col_idx = sparse_mat_col_idx_dict[onehot_col_name + np.str(each_sample[onehot_col_name])]
+        sparse_dok[each_sample.name, col_idx] = 1
+        each_line.append("%d:1" % col_idx)
+
     p1_e = time.clock()
     
     args_apply['p1_time'] += p1_e - s;
@@ -500,7 +503,7 @@ def write_libfmtxtfile_and_dok(each_sample, output_libfm_file, sparse_mat_col_id
 #     for each_prop in property_list:
 #         col_idx = sparse_mat_col_idx_dict[each_prop]
 #         each_line.append("%d:1" % col_idx)
-#         sparse_dok[args_apply['idx'], col_idx] = 1
+#         sparse_dok[each_sample.name, col_idx] = 1
         
     p2_e = time.clock()
     args_apply['p2_time'] += p2_e - p1_e;
@@ -526,11 +529,14 @@ def write_libfmtxtfile_and_dok(each_sample, output_libfm_file, sparse_mat_col_id
                 for each_item in user_clicked_cnt.index:  
                     col_idx = sparse_mat_col_idx_dict["user_clicked_%s_befroe_%dh_%s" % (colname, hour, each_item)]
                     each_line.append("%d:%d" % (col_idx, user_clicked_cnt[each_item]))
-                    sparse_dok[args_apply['idx'], col_idx] = 1
+                    sparse_dok[each_sample.name, col_idx] = user_clicked_cnt[each_item]
     
     labeled_features = args_apply['labeled_features']
-    for each in labeled_features:
-        each_line.append("%d:%.4f" % (sparse_mat_col_idx_dict[each], each_sample[each]))
+    for each_labeld in labeled_features:
+        value = each_sample[each_labeld]
+        col_idx = sparse_mat_col_idx_dict["%s%s" % (each_labeld, str(value))]
+        each_line.append("%d:%.1f" % (col_idx, LAB_ENCODE[each_labeld][value]))
+        sparse_dok[each_sample.name, col_idx] = LAB_ENCODE[each_labeld][value]
 
     output_libfm_file.write("%s\n" % " ".join(each_line))
 
@@ -540,19 +546,19 @@ def write_libfmtxtfile_and_dok(each_sample, output_libfm_file, sparse_mat_col_id
 # column 在onehot之后，在稀疏矩阵中的 列索引
 # onehot_col_list = ['user_id', 'shop_id', 
 #                    'item_id', 'item_brand_id', 
-#                    'item_city_id',          'user_gender_id', 
-#                    'user_age_level',        'user_occupation_id', 
-#                    'user_star_level',       'context_page_id',
-#                    #'hour',                  
-#                    'shop_star_level',
-#                    'shop_review_num_level', 'item_category_list', 
-#                    'shop_review_positive_rate', 'shop_score_service', 
+#                    'item_city_id']
+#                    'item_price_level', 'item_sales_level',
+#                    'item_pv_level', 'context_page_id', 
+#                    'hour', 'item_category_list',
+#                    'user_gender_id', 'user_age_level', 'user_occupation_id',
+#                    'user_star_level', 'shop_review_num_level', 'shop_star_level',
+#                    'shop_score_service', 'shop_review_positive_rate',
 #                    'shop_score_delivery', 'shop_score_description']
 
 onehot_col_list = ['user_id', 'shop_id', 
                    'item_id', 'item_brand_id', 
                    'item_city_id']
-
+idx = 0
 # 用户在点击某个 item/shop 时，之前 1， 2， 3 小时内还点击过哪些其他的 item/shop 以及次数 , 记录这些列的索引
 def user_clicked_info(df, sparse_mat_col_idx_dict):
     cols = ['item_id', 'shop_id']
@@ -593,19 +599,21 @@ def onehot_columns_to_libfmtextfile_and_sparsemat(dftrain_total, dftest):
         create_onehot_col_idx(dftrain_total, onehot_col_name,sparse_mat_col_idx_dict)
         create_onehot_col_idx(dftest, onehot_col_name,sparse_mat_col_idx_dict)
     
-    labeled_features = ['item_price_level', 'item_sales_level',
-                      'item_pv_level', 'context_page_id', 'hour', 'item_category_list',
-                      'user_gender_id', 'user_age_level', 'user_occupation_id',
-                      'user_star_level', 'shop_review_num_level', 'shop_star_level',
-                      'shop_score_service', 'shop_review_positive_rate',
-                      'shop_score_delivery', 'shop_score_description']
-    for each in labeled_features:
-        sparse_mat_col_idx_dict[each] = sparse_mat_col_idx_dict['idx']
-        sparse_mat_col_idx_dict['idx'] += 1        
+    labeled_features = set(['item_price_level', 'item_sales_level',
+                        'item_pv_level', 'context_page_id', 
+                        'hour', 'item_category_list',
+                        'user_gender_id', 'user_age_level', 'user_occupation_id',
+                        'user_star_level', 'shop_review_num_level', 'shop_star_level',
+                        'shop_score_service', 'shop_review_positive_rate',
+                        'shop_score_delivery', 'shop_score_description'])
+
+    for each_labled in labeled_features:
+        create_onehot_col_idx(dftrain_total, each_labled, sparse_mat_col_idx_dict)
+        create_onehot_col_idx(dftest, each_labled, sparse_mat_col_idx_dict)
 
      #  得到每个property的列索引
-    dftrain_total['item_property_list'].apply(split_item_property_list, args=(sparse_mat_col_idx_dict,))
-    dftest['item_property_list'].apply(split_item_property_list, args=(sparse_mat_col_idx_dict,))
+#     dftrain_total['item_property_list'].apply(split_item_property_list, args=(sparse_mat_col_idx_dict,))
+#     dftest['item_property_list'].apply(split_item_property_list, args=(sparse_mat_col_idx_dict,))
 
     # 用户在点击某个 item/shop 时，之前 1， 2， 3 小时内还点击过哪些其他的 item/shop 以及次数 , 记录这些列的索引
     user_clicked_info(dftrain_total,sparse_mat_col_idx_dict)
@@ -776,10 +784,10 @@ def extract_features_libfm(df, sparse_mat_col_idx_dict):
     return df, new_features
 
 
-def extract_features(df):
+def extract_features(X_features, df):
     old_features = set(df.columns)
-    df = onehot_features(df)
-    df = shop_features(df)
+#     df = onehot_features(df)
+    df = shop_features(X_features, df)
     df = user_features(df)
     df = item_features(df)
 
@@ -798,10 +806,20 @@ def extract_features(df):
 
 def single_preprocess(df, dftest):
     train_date = ['2018-09-17', '2018-09-18', '2018-09-19', '2018-09-20', '2018-09-21', '2018-09-22', '2018-09-23', '2018-09-24']
+    cols_lab_encoded = ['item_price_level_lab_encode', 'item_sales_level_lab_encode', 'item_pv_level_lab_encode',
+                        'context_page_id_lab_encode', 'hour_lab_encode', 'item_category_list_lab_encode',
+                         'user_gender_id_lab_encode', 'user_age_level_lab_encode', 'user_occupation_id_lab_encode',
+                         'user_star_level_lab_encode', 'shop_review_num_level_lab_encode', 'shop_star_level_lab_encode',
+                         'shop_score_service_lab_encode', 'shop_review_positive_rate_lab_encode', 'shop_score_delivery_lab_encode',
+                         'shop_score_description_lab_encode']
+    tmp = ['user_id', 'item_id', 'shop_id']
+    tmp.extend(cols_lab_encoded)
+    X_features = df[tmp].copy()
+    
     X_train = []
     original_features = set(dftest.columns)
     for each_date in train_date:
-        each_df_of_date  = extract_features(df[df['date'] == each_date])
+        each_df_of_date  = extract_features(X_features, df[df['date'] == each_date])
         print(getCurrentTime(), "df %s after extracting feature shape %s" % (each_date, each_df_of_date.shape))
         X_train.append(each_df_of_date)
     
@@ -818,8 +836,7 @@ def single_preprocess(df, dftest):
     print(getCurrentTime(), "df after all extracting feature shape",  dftest.shape)
     
     new_features = set(dftest.columns) - original_features
-    
-    onehot_columns(df, dftest, list(new_features))    
+
     return
 
 
@@ -879,9 +896,8 @@ def handle_item_category(df, outputfilename):
 def level_label_encode(df, outputfilename):
     for colname, col_lab_encode in LAB_ENCODE.items():
         print(getCurrentTime(), 'handling %s %s' % (outputfilename, colname))
-        df[colname] = df[colname].map(col_lab_encode)
-#         for col_val, val_encode in col_lab_encode.items():
-#             df.loc[df[colname] == col_val, colname] = val_encode
+        df[colname + "_lab_encode"] = df[colname].map(col_lab_encode)
+        df[colname + "_lab_encode"].fillna(0, inplace=True)
 
     df.to_csv(r'%s\..\input\%s' % (runningPath,outputfilename), index=False)
     return
@@ -891,14 +907,17 @@ def level_label_encode(df, outputfilename):
 #####################################################################################################################
 
 if __name__ == '__main__':
+    idx = 0
     print(getCurrentTime(), " running...")
     dftest = pd.read_csv(r'%s\..\input\test.txt' % runningPath)
     df = pd.read_csv(r'%s\..\input\train.txt' % runningPath)
+    
+#     single_preprocess(df, dftest)
 
 #     handle_item_category(df, 'train.txt')
 #     handle_item_category(dftest, 'test.txt')
 #     level_label_encode(df, 'train.txt')
-#     level_label_encode(dftest, 'text.txt')
+#     level_label_encode(dftest, 'test.txt')
     
 #     df = round_ratio(df)
 #     dftest = round_ratio(dftest)
