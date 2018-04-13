@@ -15,7 +15,7 @@ def logloss():
     libfm_verify_pred.columns = ['predicted_score']
     verify_label = pd.read_csv(r'%s\..\input\verify_label.txt' % runningPath)
 
-    print("Validation log loss: %.4f" % log_loss(verify_label['is_trade'], libfm_verify_pred['predicted_score']))
+    print("Validation log loss: %.6f" % log_loss(verify_label['is_trade'], libfm_verify_pred['predicted_score']))
 
     return
 
@@ -28,7 +28,7 @@ def gen_predictio():
     return
 
 if (__name__ == '__main__'):
-    gen_predictio()
+    logloss()
 
 
 

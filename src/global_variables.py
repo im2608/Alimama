@@ -13,16 +13,16 @@ def getCurrentTime():
 
 
 ITEM_LEVELS_DICT = {
-#   'item_price_level' :[i for i in range(18)], # price level 从 0--17,
-#   'item_sales_level' : [i for i in range(1, 18)], # sales level 从1--17,
-#   'item_collected_level' : [i for i in range(18)], # collect level 从 0--17,
-#   'item_pv_level'  : [i for i in range(22)], # pv level 从 0--21,
+'item_price_level' :[i for i in range(18)], # price level 从 0--17,
+'item_sales_level' : [i for i in range(1, 18)], # sales level 从1--17,
+'item_collected_level' : [i for i in range(18)], # collect level 从 0--17,
+'item_pv_level'  : [i for i in range(22)], # pv level 从 0--21,
    
    # label encode 之后的值
-  'item_price_level' :[0, 1,2,3,5,6,8],
-  'item_sales_level' : [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 13], 
-  'item_collected_level' : [ 2, 3, 5, 6, 7, 8, 9, 11], # collect level 从 0--17,
-  'item_pv_level'  : [0, 1, 2, 9], 
+#   'item_price_level' :[0, 1,2,3,5,6,8],
+#   'item_sales_level' : [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 13], 
+#   'item_collected_level' : [ 2, 3, 5, 6, 7, 8, 9, 11], # collect level 从 0--17,
+#   'item_pv_level'  : [0, 1, 2, 9], 
 }
 
 # 各个 level 销量与展示次数的比值， 比值越高，hash value 越大, 比值相近的 level value， hash value 也相近
@@ -128,20 +128,20 @@ LAB_ENCODE = {
         }
     }
 SHOP_LEVELS_DICT = {
-#   'shop_review_num_level' : [i for i in range(26)], # shop_review_num_level 从 0--25
-#   'shop_star_level' : [4999, 5000, 5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009, 5010, 5011, 5012, 5013, 5014, 5015, 5016, 5017, 5018, 5019, 5020],
-#   'shop_review_positive_rate' : [ 0., 71., 83., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
-#   'shop_score_service' : [ 0., 79., 84., 85., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
-#   'shop_score_delivery' : [ 0., 83., 84., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
-#   'shop_score_description' : [ 0., 79., 80., 81., 83., 84., 85., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.]
+'shop_review_num_level' : [i for i in range(26)], # shop_review_num_level 从 0--25
+'shop_star_level' : [4999, 5000, 5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009, 5010, 5011, 5012, 5013, 5014, 5015, 5016, 5017, 5018, 5019, 5020],
+'shop_review_positive_rate' : [ 0., 71., 83., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
+'shop_score_service' : [ 0., 79., 84., 85., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
+'shop_score_delivery' : [ 0., 83., 84., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.],
+'shop_score_description' : [ 0., 79., 80., 81., 83., 84., 85., 86., 87., 88., 89., 90., 91., 92., 93., 94., 95., 96., 97., 98., 99., 100.]
   
   # label encode 之后的值
-  'shop_review_num_level' : [ 0,  2, 10, 11, 12, 16, 17, 18, 20, 21, 22, 23, 24], 
-  'shop_star_level' : [  0, 10, 12, 15, 16, 18, 20, 22, 24, 34.],
-  'shop_review_positive_rate' :  [ 0,  1.4, 1.5,  1.8 , 2,  2.2,  2.5,  3,  3.2,  5. ],
-  'shop_score_service' : [0,  1,  1.5, 2,  2.3,  2.6,  3,  5,  7. ],
-  'shop_score_delivery' : [ 0,  1,  1.2,  1.5,  1.8,  2,  2.8,  3,  4,  5. ],
-  'shop_score_description' : [ 0,  1.4,  1.5,  1.8,  2.8,  3.2,  4.9],
+#   'shop_review_num_level' : [ 0,  2, 10, 11, 12, 16, 17, 18, 20, 21, 22, 23, 24], 
+#   'shop_star_level' : [  0, 10, 12, 15, 16, 18, 20, 22, 24, 34.],
+#   'shop_review_positive_rate' :  [ 0,  1.4, 1.5,  1.8 , 2,  2.2,  2.5,  3,  3.2,  5. ],
+#   'shop_score_service' : [0,  1,  1.5, 2,  2.3,  2.6,  3,  5,  7. ],
+#   'shop_score_delivery' : [ 0,  1,  1.2,  1.5,  1.8,  2,  2.8,  3,  4,  5. ],
+#   'shop_score_description' : [ 0,  1.4,  1.5,  1.8,  2.8,  3.2,  4.9],
   }
 
 HOUR_LAB_ENCODE = [ 1.3,  1.5,  1.6,  1.7,  1.8,  1.9 , 2.2,  2.3 , 2.6]
@@ -157,5 +157,15 @@ def order_instance_id_as_test(prediction, dftest):
             print("%s %d lines ordered\r" % (getCurrentTime(), i), end='')
 
     return ordered_predition
+
+
+
+labeled_features = set(['item_price_level', 'item_sales_level',
+                    'item_pv_level', 'context_page_id', 
+                    'hour', 'item_category_list',
+                    'user_gender_id', 'user_age_level', 'user_occupation_id',
+                    'user_star_level', 'shop_review_num_level', 'shop_star_level',
+                    'shop_score_service', 'shop_review_positive_rate',
+                    'shop_score_delivery', 'shop_score_description'])
 
 

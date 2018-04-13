@@ -58,7 +58,7 @@ def item_features(df):
         
         # item 在 colname 上各个小时的点击数量 / item 在各个 hour 上总的点击数量
         for hour in range(24):
-            df['item_click_ratio_on_%s_at_hour_%d' % (colname, hour)] = df['item_click_at_hour_%d' % hour] / df["item_click_on_%s_at_hour_%d" % (colname, hour)]
+            df['item_click_ratio_on_%s_at_hour_%d' % (colname, hour)] = df["item_click_on_%s_at_hour_%d" % (colname, hour)] / df['item_click_at_hour_%d' % hour] 
 
         df.fillna(0, inplace=True)
 

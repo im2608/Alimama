@@ -40,8 +40,7 @@ def user_features(df):
         df = pd.merge(df, click_on_col, how='left', on='user_id')
         # 用户在 colname 上的点击数量 / 用户一整天的点击数量
         for each_level in col_level:
-            if (type(each_level) == float):
-                df['user_click_ratio_on_%s_%d' % (colname, each_level)] = df['user_click_on_%s_%d' % (colname, each_level)]/df['user_click_whole_day']
+            df['user_click_ratio_on_%s_%d' % (colname, each_level)] = df['user_click_on_%s_%d' % (colname, each_level)]/df['user_click_whole_day']
             
         df.fillna(0, inplace=True)
 
@@ -62,7 +61,7 @@ def user_features(df):
 
         # 用户在 colname 上各个小时的点击数量 / 用户在各个 hour 上总的点击数量
         for hour in range(24):
-            df['user_click_ratio_on_%s_at_hour_%d' % (colname, hour)] = df['user_click_at_hour_%d' % hour] / df["user_click_on_%s_at_hour_%d" % (colname, hour)]
+            df['user_click_ratio_on_%s_at_hour_%d' % (colname, hour)] = df["user_click_on_%s_at_hour_%d" % (colname, hour)] / df['user_click_at_hour_%d' % hour]
 
         df.fillna(0, inplace=True)
 
